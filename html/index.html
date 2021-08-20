@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+
+<!-- Photon Map, a unified RF situational awareness mapping tool =
+    Copyright (C) 2020 Corey Koval
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
+
+<html lang="en">
+<head>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, height=device-height">
+  <meta charset="utf-8">
+  <script src="/js/kismetDataSource.js"></script>
+  <script src="/js/kismetAdsbDataSource.js"></script>
+  <script src="/js/sparrowDataSource.js"></script>
+
+  <script src="/node_modules/cesium/Build/Cesium/Cesium.js"></script>
+  <link href="/node_modules/cesium/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+
+  <!-- <script src="https://cesium.com/downloads/cesiumjs/releases/1.80/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.80/Build/Cesium/Widgets/widgets.css" rel="stylesheet"> -->
+  <!-- <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"> -->
+  <link href="/css/style.css" rel="stylesheet">
+  <link href="/css/menu.css" rel="stylesheet">
+</head>
+<body onload="populateData();">
+  <div id="loader" class="loader"></div>
+  <div id="cesiumContainer">
+
+  </div>
+  <script>
+    // Your access token can be found at: https://cesium.com/ion/tokens.
+    if (localStorage.accessToken) {
+      Cesium.Ion.defaultAccessToken = localStorage.accessToken;
+    }
+
+    function populateData() {
+      updateKismetInfo();
+      updateTokenInfo();
+    }
+
+    if (localStorage.kismetPass) {
+      var kismetPass = localStorage.kismetPass;
+    } else {
+      var kismetPass = "";
+    }
+
+    var viewer = new Cesium.Viewer('cesiumContainer', {
+      // imageryProvider : new Cesium.TileMapServiceImageryProvider({
+      //   url : Cesium.buildModuleUrl('Assets/Textures/NaturalEarthII')
+      // }),
+      sceneModePicker: false,
+      homeButton: false,
+      timeline: false,
+    });
+
+    viewer.infoBox.frame.setAttribute("sandbox", "allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox");
+    viewer.infoBox.frame.src = "about:blank";
+    viewer.infoBox.frame.style.minHeight = "400px";
+
+    var clock = new Cesium.Clock({
+       clockStep : Cesium.ClockStep.SYSTEM_CLOCK_MULTIPLIER
+    });
+    viewer.clock.shouldAnimate = true;
+    var kismetDataSource = new KismetDataSource();
+    var adsbDataSource = new KismetAdsbDataSource();
+    var kmlDataSources = [];
+    var geojson = new Cesium.GeoJsonDataSource();
+    var sparrowDataSource = new SparrowDataSource();
+
+    // sparrowDataSource.loadUrl("http://127.0.0.1:8020/wireless/networks/wlp62s0");
+    // sparrowDataSource.loadUrl("http://172.16.0.121:8020/wireless/networks/wlan0");
+    // viewer.dataSources.add(sparrowDataSource);
+    // Update Map every n milliseconds
+    var refreshrate = 15e3;
+    // var refreshAdsb = setInterval(function () { refreshKismetAdsb(); }, refreshrate);
+    // clearInterval(refreshAdsb);
+
+    function refreshKismet() {
+      viewer.dataSources.remove(kismetDataSource);
+      if (localStorage.kismetTime &&
+          localStorage.kismetUrl &&
+          localStorage.kismetUser &&
+          kismetPass != "") {
+        let devices = `/devices/last-time/${localStorage.kismetTime}/devices.json`;
+        kismetDataSource.loadUrl(localStorage.kismetUrl + devices, localStorage.kismetUser, kismetPass);
+        viewer.dataSources.add(kismetDataSource);
+      } else {
+        alert("Ensure Kismet login info is filled in!");
+      }
+    }
+    function refreshKismetAdsb() {
+      viewer.dataSources.remove(adsbDataSource);
+      if (localStorage.kismetTime &&
+          localStorage.kismetUrl &&
+          localStorage.kismetUser &&
+          kismetPass != "") {
+        let adsbDevices = `/devices/views/phy-RTLADSB/last-time/${localStorage.kismetTime}/devices.json`;
+        adsbDataSource.loadUrl(localStorage.kismetUrl + adsbDevices, localStorage.kismetUser, kismetPass);
+        viewer.dataSources.add(adsbDataSource);
+      } else {
+        clearInterval(refreshAdsb);
+        alert("Ensure Kismet login info is filled in!");
+      }
+    }
+
+    function refreshAllKismet() {
+      refreshKismet();
+      refreshKismetAdsb();
+      var refreshAdsb = setInterval(function () { refreshKismetAdsb(); }, refreshrate);
+    }
+
+    function setKmlOpacity(kmlIndex, i, opacity) {
+      if (!kmlDataSources[kmlIndex].entities.values[i].rectangle.material.color) {
+        kmlDataSources[kmlIndex].entities.values[i].rectangle.material.color = new Cesium.Color(1, 1, 1, opacity);
+      } else {
+        kmlDataSources[kmlIndex].entities.values[i].rectangle.material.color._value.alpha = opacity;
+      }
+    }
+    // var hpr = new Cesium.HeadingPitchRange(0.0, -1.57, 0.0);
+    // viewer.zoomTo(dataSource.entities._entities.values[0], {'offset':hpr});
+    // console.log(adsbDataSource);
+    //
+    // function loadApCzml() {
+    //   let parameter = "";
+    //
+    //   let spinner = document.getElementById("loader");
+    //   spinner.style.visibility = "visible";
+    //   spinner.style.zIndex = "10";
+    //   // console.log(parameter);
+    //   let promise1 = transmittersDataSource.load('/output.czml?'+parameter);
+    //   Cesium.when(promise1, function(dataSource1){
+    //     spinner.style.visibility = "hidden";
+    //     spinner.style.zIndex = "0";
+    //   });
+    //   viewer.dataSources.add(accessPointDataSource);
+    //   return accessPointDataSource;
+    // }
+    //
+    // function loadAllCzml() {
+    //   return loadApCzml();
+    // }
+
+    function clearOld() {
+      viewer.dataSources.removeAll(true);
+      // console.log("Cleared old");
+    }
+
+  </script>
+  <script>
+    function showOutterMenu(menuId) {
+      menuId.style.transform = "translate(85%, 0)";
+      document.getElementById("openCloseText").innerText = "Close";
+      document.getElementById("openCloseButton").style.display = "flex";
+    }
+
+    function hideOutterMenu(menuId) {
+      menuId.style.transform = "";
+      document.getElementById("openCloseText").innerText = "";
+      document.getElementById("openCloseButton").style.display = "none";
+    }
+
+    function showTab(tabId) {
+      for (let element of document.getElementsByName('tab')) {
+        hideTab(element);
+      }
+      tabId.style.zIndex = 10;
+    }
+
+    function hideTab(tabId) {
+      tabId.style.zIndex = 0;
+    }
+
+    function showHideMenu(checkBox, menuId, contentId) {
+      if (checkBox.checked) {
+        showOutterMenu(menuId);
+        showTab(contentId);
+      } else {
+        hideOutterMenu(menuId);
+        hideTab(contentId);
+      }
+    }
+  </script>
+  <script>
+    var scene = viewer.scene;
+    if (!scene.pickPositionSupported) {
+      window.alert("This browser does not support pickPosition.");
+    }
+
+    var handler;
+    var cartesian;
+    var cartographic
+    var center_lat;
+    var center_lon;
+
+    // ***********************************************
+    // Disable/enable object selection as needed.
+    //************************************************
+    var noSelect = false;
+    var defaultClickHandler = viewer.screenSpaceEventHandler.getInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
+    var myClickFunction = function(event) {
+      if (!noSelect) {
+        defaultClickHandler(event);
+      } else {
+        viewer.selectedEntity = undefined;
+        viewer.trackedEntity = undefined;
+      }
+    };
+    viewer.screenSpaceEventHandler.setInputAction(myClickFunction, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+    function clearHover() {
+      noSelect = false;
+      viewer.entities.removeAll();
+      handler = handler && handler.destroy();
+    };
+
+    // Pick the center point of a circle
+    function pickCenter(lat_element_id, lon_element_id) {
+      noSelect = true;
+      var entity = viewer.entities.add({
+        label: {
+          show: false,
+          showBackground: true,
+          font: "14px monospace",
+          horizontalOrigin: Cesium.HorizontalOrigin.LEFT,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(15, 0),
+        },
+      });
+      handler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
+      // Mouse over the globe to see the cartographic position
+      handler.setInputAction(function (movement) {
+        cartesian = viewer.camera.pickEllipsoid(
+          movement.endPosition,
+          scene.globe.ellipsoid
+        );
+        cartographic = Cesium.Cartographic.fromCartesian(cartesian);
+        if (cartesian) {
+          var center_lon = Cesium.Math.toDegrees(
+            cartographic.longitude
+          ).toFixed(5);
+          var center_lat = Cesium.Math.toDegrees(
+            cartographic.latitude
+          ).toFixed(5);
+
+          lat_element_id.value = center_lat;
+          lon_element_id.value = center_lon;
+          entity.position = cartesian;
+          entity.label.show = true;
+          entity.label.text =
+            "Lat: " +
+            ("   " + center_lat).slice(-10) +
+            "\nLon: " +
+            ("   " + center_lon).slice(-10);
+        } else {
+          entity.label.show = false;
+        }
+      }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+      handler.setInputAction(function () {
+        clearHover();
+      }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+    }
+  </script>
+
+  <div id="outterMenu">
+    <div id="tabContainer">
+      <div id="openCloseButton" style="display: none;" class="menuTab"><span id="openCloseText"></span>
+        <input class="menuCheckbox" type="radio" name="tabSelect" id="close" onclick="hideOutterMenu(getElementById('outterMenu'));" >
+      </div>
+
+      <div class="menuTab">Kismet
+        <input class="menuCheckbox" type="radio" name="tabSelect" id="kismetTab"
+          onclick="showHideMenu(this, getElementById('outterMenu'), getElementById('kismetMenu'));" >
+      </div>
+
+      <div
+        class="menuTab">
+        Sparrow
+        <input class="menuCheckbox" type="radio" name="tabSelect" id="sparrowTab"
+          onclick="showHideMenu(this, getElementById('outterMenu'), getElementById('sparrowMenu'));" >
+      </div>
+      <div
+        class="menuTab">
+        File Upload
+        <input class="menuCheckbox" type="radio" name="tabSelect" id="fileTab"
+          onclick="showHideMenu(this, getElementById('outterMenu'), getElementById('fileMenu'));" >
+      </div>
+      <div
+        class="menuTab">
+        Splat
+        <input class="menuCheckbox" type="radio" name="tabSelect" id="splatTab"
+          onclick="showHideMenu(this, getElementById('outterMenu'), getElementById('splatMenu'));" >
+      </div>
+      <div
+        class="menuTab">
+        Settings
+        <input class="menuCheckbox" type="radio" name="tabSelect" id="settingsTab"
+          onclick="showHideMenu(this, getElementById('outterMenu'), getElementById('settingsMenu'));" >
+      </div>
+    </div>
+    <div name="tab" class="innerMenu" id="kismetMenu">
+      <div>
+        <span>Server URL:</span>
+        <input id="kismetUrlInput" onfocusout="localStorage.kismetUrl = this.value;"/><br>
+        <span>Username:</span>
+        <input id="kismetUserInput" onfocusout="localStorage.kismetUser = this.value;"/><br>
+        <span>Password:</span>
+        <input id="kismetPassInput" type="password" onfocusout="kismetPass = this.value;"/><br>
+        <input name="saveKismetPass" type="checkbox" id="saveKismetPass" onchange="updateKismetPass(this, kismetPass)" />
+        <label for="saveKismetPass">Save Password</label><br>
+        <span>Show past</span>
+        <input name="kismetTime" id="kismetTimeInput" style="width: 50px;" type="number" onfocusout="localStorage.kismetTime = -this.value;"/>
+        <label for="kismetTime">Seconds</label><br>
+        <input type="button" value="Update Kismet Data" onclick="refreshAllKismet();" /><br>
+        <span style="align-items: center; display: inline-flex;">
+          <p>Show Devices:</p>
+          <input type="checkbox" checked onchange="kismetDataSource.entities.show = this.checked;" />
+          <button class="material-icons menu-button" onclick="viewer.flyTo(kismetDataSource.entities);">gps_fixed</button>
+        </span><br>
+        <span style="align-items: center; display: inline-flex;">
+          <p>Show ADS-B:</p>
+          <input type="checkbox" checked onchange="adsbDataSource.entities.show = this.checked;" />
+          <button class="material-icons menu-button" onclick="viewer.flyTo(adsbDataSource.entities);">gps_fixed</button>
+        </span><br>
+        <script>
+          function updateKismetPass(savepass, pass) {
+            if (savepass.checked) {
+              localStorage.kismetPass = pass;
+              localStorage.saveKismetPass = true;
+            } else {
+              localStorage.removeItem("kismetPass");
+              localStorage.saveKismetPass = false;
+            }
+          }
+          function updateKismetInfo() {
+            if (localStorage.kismetUrl) {
+              document.getElementById("kismetUrlInput").value = localStorage.kismetUrl;
+            }
+            if (localStorage.kismetUser) {
+              document.getElementById("kismetUserInput").value = localStorage.kismetUser;
+            }
+            if (localStorage.kismetPass) {
+              document.getElementById("kismetPassInput").value = localStorage.kismetPass;
+            }
+            if (localStorage.kismetTime) {
+              document.getElementById("kismetTimeInput").value = -localStorage.kismetTime;
+            }
+            if (localStorage.saveKismetPass == "true") {
+              document.getElementById("saveKismetPass").checked = true;
+            }
+            if (localStorage.kismetTime &&
+                localStorage.kismetUrl &&
+                localStorage.kismetUser &&
+                localStorage.kismetPass) {
+              refreshAllKismet();
+            }
+          }
+        </script>
+      </div>
+    </div>
+    <div name="tab" class="innerMenu" id="sparrowMenu">
+      SparrowStuffHere
+    </div>
+    <div name="tab" class="innerMenu" id="fileMenu">
+      <div id="fileList">
+        <h2>File Upload</h2>
+        <p>Open a KML, KMZ, or GeoJSON File</p><br>
+        <input type="file" id="fileInput" onchange='openFile(event)'
+        accept=".kml,.kmz,.geojson,application/vnd.google-earth.kmz,application/vnd.google-earth.kml+xml,application/geo+json"/><br>
+        <h3>Files:</h3>
+        <div id="entityDisplay">
+        </div>
+        <script>
+          var openFile = function(event) {
+            var input = event.target;
+            var file = input.files[0];
+            // console.log(file.type);
+            if (file.type.includes("application/vnd.google-earth")) {
+              let entityDisplay = document.getElementById("entityDisplay");
+              let fileName = document.createElement("h3");
+              fileName.innerText = file.name;
+              entityDisplay.appendChild(fileName);
+              let showSpan = document.createElement("span");
+              showSpan.style.alignItems = "center";
+              showSpan.style.display = "inline-flex";
+              let showBox = document.createElement("input");
+              showBox.type = "checkbox";
+              showBox.checked = true;
+              showBox.setAttribute(
+                "onchange",
+                `kmlDataSources[${kmlDataSources.length}].show = this.checked;`
+              );
+              let zoomButton = document.createElement("button");
+              zoomButton.classList.add("material-icons","menu-button");
+              zoomButton.setAttribute("onclick", `viewer.flyTo(kmlDataSources[${kmlDataSources.length}].entities);`);
+              zoomButton.innerText = "gps_fixed";
+              entityDisplay.appendChild(showSpan);
+              showSpan.appendChild(document.createTextNode("Show:"));
+              showSpan.appendChild(showBox);
+              showSpan.appendChild(zoomButton);
+              entityDisplay.appendChild(document.createElement("br"));
+              let kml = new Cesium.KmlDataSource();
+              kml.load(URL.createObjectURL(file)).then( res => {
+                for (let label of kml.entities.values) {
+                  if (label.label) {
+                    let showLabel = document.createElement("input");
+                    showLabel.type = "checkbox";
+                    showLabel.checked = true;
+                    showLabel.setAttribute(
+                      "onchange",
+                      `showHideLabels(${kmlDataSources.length}, this.checked);`
+                    );
+                    entityDisplay.appendChild(document.createTextNode("Show Labels:"));
+                    entityDisplay.appendChild(showLabel);
+                    entityDisplay.appendChild(document.createElement("br"));
+                    break;
+                  }
+                }
+                for (var [i, entity] of kml.entities.values.entries()) {
+                  let entitySpan = document.createElement("span");
+                  if (entity.rectangle) {
+                    entityDisplay.appendChild(document.createTextNode(`${entity.name} `));
+                    let opacitySlider = document.createElement("input");
+                    opacitySlider.type = "range";
+                    opacitySlider.min = 0;
+                    opacitySlider.max = 1;
+                    opacitySlider.step = 0.05;
+                    opacitySlider.setAttribute(
+                      "oninput",
+                      `setKmlOpacity(${kmlDataSources.length}, ${i}, this.value)`
+                    );
+                    entityDisplay.appendChild(document.createTextNode("Opacity: "));
+                    entityDisplay.appendChild(opacitySlider);
+                    entityDisplay.appendChild(document.createElement("br"));
+                  }
+                }
+                entityDisplay.appendChild(document.createElement("hr"));
+                kmlDataSources.push(kml);
+                viewer.flyTo(viewer.dataSources.add(kmlDataSources[kmlDataSources.length - 1]));
+              });
+            } else if (file.type == "application/geo+json") {
+              viewer.dataSources.remove(geojson);
+              geojson.load(URL.createObjectURL(file));
+              viewer.flyTo(viewer.dataSources.add(geojson));
+            } else {
+              alert("Unknown File Type");
+            }
+
+          };
+          function showHideLabels(i, show) {
+            for (thing of kmlDataSources[i].entities.values) {
+              if (thing.label) {
+                thing.label.show = show;
+              }
+            }
+          }
+        </script>
+      </div>
+    </div>
+    <div name="tab" class="innerMenu" id="splatMenu">
+      <div>
+        <script>
+          if (localStorage.splatUrl){
+            var splatUrl = localStorage.splatUrl;
+          } else {
+            var splatUrl = "";
+          }
+          var splatCallsign;
+          var splatLat;
+          var splatLon;
+          var splatAgl;
+          var splatInsertType = "original";
+        </script>
+        <span>Splat Server URL:</span>
+        <input id="splatUrl" name="splatUrl" placeholder="http://localhost/Splat"
+          title="Don't forget http://" onfocusout="localStorage.splatUrl = this.value;"/><br>
+        <script>document.getElementById("splatUrl").value = splatUrl;</script>
+        <span>Callsign:</span>
+        <input type="text" id="splatCallsign" name="callsign" onfocusout="splatCallsign = this.value;"/><br>
+        <span>Latitude:</span>
+        <input type="number" step="any" id="splatLat" name="latitude"/>
+        <button title="Pick Coordinates from Map" class="material-icons menu-button"
+          style="vertical-align: top; padding: 0; color: black;"
+          onclick="pickCenter(document.getElementById('splatLat'), document.getElementById('splatLon'));">
+          gps_fixed
+        </button>
+        <br>
+        <span>Longitude:</span>
+        <input type="number" step="any" id="splatLon" name="longitude"/><br>
+        <span>Height AGL:</span>
+        <input type="number" step="any" id="splatAgl" name="antenna" onfocusout="splatAgl = this.value;"/><br>
+        <span>Select Region:</span>
+        <select id="splatGeography" name='geography'>
+          <option value='North_America' selected='selected'>North America</option>
+          <option value='South_America'>South America</option>
+          <option value='Eurasia'> Eurasia</option>
+          <option value='Islands'>Islands</option>
+          <option value='Australia'>Australia</option>
+          <option value='Africa'>Africa</option>
+        </select><br>
+        <span>Select State:</span>
+        <select id="splatState" name='state'>
+          <option value='NOSTATE' selected='selected'>Not in USA</option>
+          <option value='Alabama'>Alabama</option>
+          <option value='Alaska'>Alaska</option>
+          <option value='Arizona'>Arizona</option>
+          <option value='Arkansas'>Arkansas</option>
+          <option value='California'>California</option>
+          <option value='Colorado'>Colorado</option>
+          <option value='Connecticut'>Connecticut</option>
+          <option value='Delaware'>Delaware</option>
+          <option value='District of Columbia'>District of Columbia</option>
+          <option value='Florida'>Florida</option>
+          <option value='Georgia'>Georgia</option>
+          <option value='Hawaii'>Hawaii</option>
+          <option value='Idaho'>Idaho</option>
+          <option value='Illinois'>Illinois</option>
+          <option value='Indiana'>Indiana</option>
+          <option value='Iowa'>Iowa</option>
+          <option value='Kansas'>Kansas</option>
+          <option value='Kentucky'>Kentucky</option>
+          <option value='Louisiana'>Louisiana</option>
+          <option value='Maine'>Maine</option>
+          <option value='Maryland'>Maryland</option>
+          <option value='Massachusetts'>Massachusetts</option>
+          <option value='Michigan'>Michigan</option>
+          <option value='Minnesota'>Minnesota</option>
+          <option value='Mississippi'>Mississippi</option>
+          <option value='Missouri'>Missouri</option>
+          <option value='Montana'>Montana</option>
+          <option value='Nebraska'>Nebraska</option>
+          <option value='Nevada'>Nevada</option>
+          <option value='New Hampshire'>New Hampshire</option>
+          <option value='New Jersey'>New Jersey</option>
+          <option value='New Mexico'>New Mexico</option>
+          <option value='New York'>New York</option>
+          <option value='North Carolina'>North Carolina</option>
+          <option value='North Dakota'>North Dakota</option>
+          <option value='Ohio'>Ohio</option>
+          <option value='Oklahoma'>Oklahoma</option>
+          <option value='Oregon'>Oregon</option>
+          <option value='Pennsylvania'>Pennsylvania</option>
+          <option value='Rhode Island'>Rhode Island</option>
+          <option value='South Carolina'>South Carolina</option>
+          <option value='South Dakota'>South Dakota</option>
+          <option value='Tennessee'>Tennessee</option>
+          <option value='Texas'>Texas</option>
+          <option value='Utah'>Utah</option>
+          <option value='Vermont'>Vermont</option>
+          <option value='Virginia'>Virginia</option>
+          <option value='Washington'>Washington</option>
+          <option value='West Virginia'>West Virginia</option>
+          <option value='Wisconsin'>Wisconsin</option>
+          <option value='Wyoming'>Wyoming</option>
+        </select>
+        <div style="border:1px solid black;">
+          <span>Registration Type:</span><br>
+          <input type='radio' name='inserttype' value='original' checked="checked"
+            onfocusout="if (this.checked) splatInsertType = this.value;"> New Registration<br>
+          <input type='radio' name='inserttype' value='update'
+            onfocusout="if (this.checked) splatInsertType = this.value;"> Update an Existing Registration<br>
+        </div>
+        <button onclick="splatEnroll();">Submit</button>
+        <br>
+        <span id="splatStatus" style="font-weight: bold; width: unset;"></span>
+      </div>
+      <script>
+        function splatEnroll() {
+          var splatGeo = document.getElementById("splatGeography").value;
+          var splatState = document.getElementById("splatState").value;
+          var splatLat = document.getElementById("splatLat").value;
+          var splatLon = document.getElementById("splatLon").value;
+          const otherParams = {
+              "headers": {
+                "content-type":"application/x-www-form-urlencoded",
+              },
+              "method": "POST",
+              "body":
+              `callsign=${splatCallsign}&inserttype=${splatInsertType}`+
+              `&longitude=${splatLon}&geography=${splatGeo}&state=${splatState}`+
+              `&latitude=${splatLat}&antenna=${splatAgl}`,
+          };
+          // clearOld();
+          fetch(`${localStorage.splatUrl}/enroll.pl`, otherParams)
+            .then(res => {
+              // document.getElementById("splatEnrollFields").reset();
+              document.getElementById("splatStatus").innerText = `Successfully Enrolled ${splatCallsign}`;
+            });
+        }
+      </script>
+      <img src="/img/Longley_Rice-Legend.png" />
+    </div>
+    <div name="tab" class="innerMenu" id="settingsMenu">
+      <div>
+        <span>Cesium Ion Token:</span><br>
+        <textarea id="tokenlInput" rows="5" cols="40"
+        onfocusout="localStorage.accessToken = this.value.trim();"
+        >Your access token can be found at: https://cesium.com/ion/tokens.</textarea>
+        <br>
+        <script>
+          function updateTokenInfo() {
+            if (localStorage.accessToken) {
+              document.getElementById("tokenlInput").value = localStorage.accessToken;
+            }
+          }
+        </script>
+      </div>
+    </div>
+  </body>
+</html>
