@@ -196,6 +196,14 @@
   </script>
   <script>
     var scene = viewer.scene;
+    var pickingPosition = false;
+
+    function setPickPosition(lat_element_id, lon_element_id){
+      if (!pickingPosition){
+        pickCenter(lat_element_id, lon_element_id);
+      }
+    }
+
     if (!scene.pickPositionSupported) {
       window.alert("This browser does not support pickPosition.");
     }
@@ -223,12 +231,14 @@
 
     function clearHover() {
       noSelect = false;
+      pickingPosition = false;
       viewer.entities.removeAll();
       handler = handler && handler.destroy();
     };
 
     // Pick the center point of a circle
     function pickCenter(lat_element_id, lon_element_id) {
+      pickingPosition = true;
       noSelect = true;
       var entity = viewer.entities.add({
         label: {
@@ -495,7 +505,7 @@
         <input type="number" step="any" id="splatLat" name="latitude"/>
         <button title="Pick Coordinates from Map" class="material-icons menu-button"
           style="vertical-align: top; padding: 0; color: black;"
-          onclick="pickCenter(document.getElementById('splatLat'), document.getElementById('splatLon'));">
+          onclick="setPickPosition(document.getElementById('splatLat'), document.getElementById('splatLon'));">
           gps_fixed
         </button>
         <br>

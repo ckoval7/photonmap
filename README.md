@@ -21,6 +21,8 @@ Next, you'll need the Cesium JS library. The easiest way to get it is with NPM.
     cd html
     npm install cesium
 
+This should create a directory called `node_modules` with a sub-directory called
+`cesium`
 
 ## Running
 
@@ -33,8 +35,9 @@ a basic Python web server. The quickest way to get started is:
 ## What works right now:
 
 - Connects to a single Kismet server.
-  - `httpd_allow_cors=true` and `httpd_allowed_origin=http://origin.url` need to
-  be set in [`kismet_httpd.conf`](https://www.kismetwireless.net/docs/readme/webserver/)
+  - `httpd_allow_cors=true` must be set in
+  [`kismet_httpd.conf`](https://www.kismetwireless.net/docs/readme/webserver/)
+  - optionally set `httpd_allowed_origin=http://url.of.photonmap:portnumber`
   - Will show the location of all devices last seen in a user specified time frame.
   Use 0 for unlimited.
   - Will show ADS-B devices in 3D space
