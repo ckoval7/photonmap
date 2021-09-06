@@ -292,3 +292,77 @@ body {
     overflow: hidden;
     outline:none;
 }
+
+.collapsible {
+  display: block;
+}
+
+.collapser {
+  cursor: pointer;
+  border: 1px transparent dotted;
+  background-color: #333;
+  color: #e5e5e5;
+  font-size: 16px;
+  margin-left: 10px;
+  padding-right: 10px;
+  padding-left: 10px;
+  user-select: none;
+}
+
+.collapser:hover {
+  background-color: #555;
+}
+
+.arrow {
+  font-weight: bold;
+  user-select: none;
+  margin-left: 0.5em;
+  display: inline-block;
+  transform: rotate(90deg);
+  transition: transform .25s ease-out;
+}
+
+.collapsibleInput {
+  position: absolute;
+  left: -9999px;
+  &:focus ~ .collapser{
+    border-color: grey;
+  }
+}
+
+.collapsibleInput:checked ~ .arrow,
+.collapsibleInput:checked ~ .collapser .arrow {
+  transform: rotate(270deg);
+}
+
+.collapsed {
+  font-size: 0;
+  margin: 0;
+  opacity: 0;
+  padding: 0;
+  background: #eee;
+  display: none;
+  overflow: hidden;
+
+  /* fade out, then shrink */
+  transition:
+    opacity .25s,
+    margin .5s 0.25s,
+    font-size .5s 0.25s,
+    padding .5s .25s;
+}
+
+.collapsibleInput:checked ~ .collapsed {
+  font-size: 14px;
+  opacity: 1;
+  height: auto;
+  padding: 5px 0;
+  display: block;
+
+  /* grow, then fade in */
+  transition:
+    margin .25s,
+    padding .25s,
+    font-size .25s,
+    opacity .5s .25s;
+}

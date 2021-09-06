@@ -73,7 +73,8 @@
       timeline: false,
     });
 
-    viewer.infoBox.frame.setAttribute("sandbox", "allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox");
+    viewer.infoBox.frame.setAttribute("sandbox",
+      "allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox");
     viewer.infoBox.frame.src = "about:blank";
     viewer.infoBox.frame.style.minHeight = "400px";
     // viewer.infoBox.frame.style.maxWidth = "500px";
@@ -306,7 +307,8 @@
   <div id="outterMenu">
     <div id="tabContainer">
       <div id="openCloseButton" style="display: none;" class="menuTab"><span id="openCloseText"></span>
-        <input class="menuCheckbox" type="radio" name="tabSelect" id="close" onclick="hideOutterMenu(getElementById('outterMenu'));" >
+        <input class="menuCheckbox" type="radio" name="tabSelect" id="close"
+          onclick="hideOutterMenu(getElementById('outterMenu'));" >
       </div>
 
       <div class="menuTab">Kismet
@@ -350,7 +352,8 @@
         <input name="saveKismetPass" type="checkbox" id="saveKismetPass" onchange="updateKismetPass(this, kismetPass)" />
         <label for="saveKismetPass">Save Password</label><br>
         <span>Show past</span>
-        <input name="kismetTime" id="kismetTimeInput" style="width: 50px;" type="number" onfocusout="localStorage.kismetTime = -this.value;"/>
+        <input name="kismetTime" id="kismetTimeInput" style="width: 50px;"
+          type="number" onfocusout="localStorage.kismetTime = -this.value;"/>
         <label for="kismetTime">Seconds</label><br>
         <input type="button" value="Update Kismet Data" onclick="refreshAllKismet();" /><br>
         <span style="align-items: center; display: inline-flex;">
@@ -407,23 +410,29 @@
         <h2>File Upload</h2>
         <p>Open a KML, KMZ, or GeoJSON File</p><br>
         <input type="file" id="fileInput" onchange='openFile(event)'
-        accept=".kml,.kmz,.geojson,application/vnd.google-earth.kmz,application/vnd.google-earth.kml+xml,application/geo+json"/><br>
+        accept=".kml,.kmz,.geojson,application/vnd.google-earth.kmz,application/vnd.google-earth.kml+xml,application/geo+json"/>
+        <br>
         <h3>Files:</h3>
+
         <div id="entityDisplay">
         </div>
         <script>
           var openFile = function(event) {
             var input = event.target;
             var file = input.files[0];
-            // console.log(file.type);
+
+
             if (file.type.includes("application/vnd.google-earth")) {
               let entityDisplay = document.getElementById("entityDisplay");
+
               let fileName = document.createElement("h3");
               fileName.innerText = file.name;
               entityDisplay.appendChild(fileName);
+
               let showSpan = document.createElement("span");
               showSpan.style.alignItems = "center";
               showSpan.style.display = "inline-flex";
+
               let showBox = document.createElement("input");
               showBox.type = "checkbox";
               showBox.checked = true;
@@ -431,15 +440,18 @@
                 "onchange",
                 `kmlDataSources[${kmlDataSources.length}].show = this.checked;`
               );
+
               let zoomButton = document.createElement("button");
               zoomButton.classList.add("material-icons","menu-button");
               zoomButton.setAttribute("onclick", `viewer.flyTo(kmlDataSources[${kmlDataSources.length}].entities);`);
               zoomButton.innerText = "gps_fixed";
+
               entityDisplay.appendChild(showSpan);
               showSpan.appendChild(document.createTextNode("Show:"));
               showSpan.appendChild(showBox);
               showSpan.appendChild(zoomButton);
               entityDisplay.appendChild(document.createElement("br"));
+
               let kml = new Cesium.KmlDataSource();
               kml.load(URL.createObjectURL(file)).then( res => {
                 for (let label of kml.entities.values) {
@@ -457,19 +469,47 @@
                     break;
                   }
                 }
+
+                let collapsible = document.createElement("label");
+                collapsible.classList.add("collapsible");
+
+                let collapseCheckbox = document.createElement("input");
+                collapseCheckbox.type = "checkbox";
+                collapseCheckbox.classList.add("collapsibleInput");
+                collapsible.appendChild(collapseCheckbox);
+
+                let collapser = document.createElement("span");
+                collapser.classList.add("collapser");
+                collapser.innerText = "Entities";
+                collapsible.appendChild(collapser);
+
+                let arrow = document.createElement("span");
+                arrow.classList.add("arrow");
+                arrow.innerText = ">";
+                collapsible.appendChild(arrow);
+
+                let collapsed = document.createElement("div");
+                collapsed.classList.add("collapsed");
+                collapsible.appendChild(collapsed)
+
+                entityDisplay.appendChild(collapsible);
+
                 let entityList = document.createElement("ul");
                 for (var [i, entity] of kml.entities.values.entries()) {
-                  // let entitySpan = document.createElement("span");
                   let entitySpan = document.createElement("li");
                   let showEntity = document.createElement("input");
                   showEntity.type = "checkbox";
-                  showEntity.checked = true;
+                  showEntity.checked = entity.show;
                   showEntity.setAttribute(
                     "onchange",
                     `kmlDataSources[${kmlDataSources.length}].entities.values[${i}].show = this.checked;`
                   );
                   entitySpan.appendChild(showEntity);
-                  entitySpan.appendChild(document.createTextNode(`${entity.name} `));
+                  entitySpan.appendChild(document.createTextNode(entity.name));
+
+                  /**********************
+                  Setup Opacity Slider for rectangles
+                  **********************/
                   if (entity.rectangle) {
                     let opacitySlider = document.createElement("input");
                     opacitySlider.type = "range";
@@ -480,13 +520,16 @@
                       "oninput",
                       `setKmlOpacity(${kmlDataSources.length}, ${i}, this.value)`
                     );
-                    entitySpan.appendChild(document.createTextNode("Opacity: "));
+                    entitySpan.appendChild(document.createTextNode("\nOpacity: "));
                     entitySpan.appendChild(opacitySlider);
                   }
+                  // End opacity slider
+
                   entityList.appendChild(entitySpan);
-                  // entityDisplay.appendChild(document.createElement("br"));
                 }
-                entityDisplay.appendChild(entityList);
+
+                collapsed.appendChild(entityList);
+
                 entityDisplay.appendChild(document.createElement("hr"));
                 kmlDataSources.push(kml);
                 viewer.flyTo(viewer.dataSources.add(kmlDataSources[kmlDataSources.length - 1]));
