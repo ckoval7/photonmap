@@ -417,6 +417,17 @@
         <div id="entityDisplay">
         </div>
         <script>
+
+          function createZoomButton(entity) {
+            //entity should be a literal!
+            let zoomButton = document.createElement("button");
+            zoomButton.classList.add("material-icons","menu-button");
+            zoomButton.setAttribute("onclick", `viewer.flyTo(${entity});`);
+            zoomButton.innerText = "gps_fixed";
+
+            return zoomButton;
+          }
+
           var openFile = function(event) {
             var input = event.target;
             var file = input.files[0];
@@ -441,10 +452,12 @@
                 `kmlDataSources[${kmlDataSources.length}].show = this.checked;`
               );
 
-              let zoomButton = document.createElement("button");
-              zoomButton.classList.add("material-icons","menu-button");
-              zoomButton.setAttribute("onclick", `viewer.flyTo(kmlDataSources[${kmlDataSources.length}].entities);`);
-              zoomButton.innerText = "gps_fixed";
+              // let zoomButton = document.createElement("button");
+              // zoomButton.classList.add("material-icons","menu-button");
+              // zoomButton.setAttribute("onclick", `viewer.flyTo(kmlDataSources[${kmlDataSources.length}].entities);`);
+              // zoomButton.innerText = "gps_fixed";
+
+              let zoomButton = createZoomButton(`kmlDataSources[${kmlDataSources.length}].entities);`);
 
               entityDisplay.appendChild(showSpan);
               showSpan.appendChild(document.createTextNode("Show:"));
@@ -506,6 +519,7 @@
                   );
                   entitySpan.appendChild(showEntity);
                   entitySpan.appendChild(document.createTextNode(entity.name));
+                  // entitySpan.setAttribute("onclick", `kmlDataSources[${kmlDataSources.length}].entities.values[${i}]`);
 
                   /**********************
                   Setup Opacity Slider for rectangles
@@ -524,6 +538,9 @@
                     entitySpan.appendChild(opacitySlider);
                   }
                   // End opacity slider
+
+                  let entityZoom = createZoomButton(`kmlDataSources[${kmlDataSources.length}].entities.values[${i}]`);
+                  entitySpan.appendChild(entityZoom);
 
                   entityList.appendChild(entitySpan);
                 }

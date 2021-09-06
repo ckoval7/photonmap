@@ -285,8 +285,9 @@ body {
 .menu-button {
     background-color: Transparent;
     background-repeat:no-repeat;
-    color: white;
-    font-size: 18pt;
+    /* color: white; */
+    color: #444;
+    font-size: 16pt;
     border: none;
     cursor:pointer;
     overflow: hidden;
